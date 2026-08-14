@@ -3,7 +3,7 @@
 ## Reporting a vulnerability
 
 Please **do not** open a public issue for security problems. Instead, report
-privately by email to `ritesh.wanave@siemens.com` or via a [private advisory]
+privately by email to `riteshwanave@gmail.com` or via a [private advisory]
 (https://github.com/RiteshWanave/vsc-gitlab-mr/security/advisories/new).
 
 Please include:
