@@ -6,7 +6,8 @@ import { MrMonitor, MonitorEvent, EnrichedMR } from './monitor';
 import { MrViewProvider } from './mrViewProvider';
 import { MrCommentProvider } from './comments';
 import { createMrFlow, editMrFlow } from './createMr';
-import { findGitRoot, getOriginUrl, projectPathFromRemote, getBranch } from './repo';
+import { getOriginUrl, projectPathFromRemote, getBranch } from './repo';
+import { findGitRoot } from './workspace';
 
 export function activate(context: vscode.ExtensionContext): void {
   let gitlab: GitLabClient | null = null;

@@ -1,5 +1,8 @@
 .vscode/**
+.github/**
 src/**
+tests/**
 node_modules/**
 tsconfig.json
+eslint.config.js
 **/*.map
