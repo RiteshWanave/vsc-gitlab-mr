@@ -1,0 +1,116 @@
+{
+  "name": "gitlab-mr-monitor",
+  "displayName": "GitLab MR Monitor & Creator",
+  "description": "Monitor GitLab merge requests and create MRs from the current branch using .gitlab/merge_request_templates",
+  "version": "0.0.5",
+  "publisher": "gitlab-mr-monitor",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/RiteshWanave/vsc-gitlab-mr.git"
+  },
+  "bugs": {
+    "url": "https://github.com/RiteshWanave/vsc-gitlab-mr/issues"
+  },
+  "keywords": [
+    "gitlab",
+    "merge request",
+    "pull request",
+    "mr",
+    "ci",
+    "pipeline",
+    "review"
+  ],
+  "engines": {
+    "vscode": "^1.125.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "gitlabMr",
+          "title": "GitLab MR",
+          "icon": "media/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "gitlabMr": [
+        {
+          "id": "gitlabMr.mrView",
+          "name": "Merge Requests",
+          "type": "webview"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "gitlabMr.refresh",
+        "title": "GitLab MR: Refresh",
+        "icon": "$(sync)"
+      },
+      {
+        "command": "gitlabMr.createMr",
+        "title": "GitLab MR: Create Merge Request from current branch",
+        "icon": "$(git-pull-request)"
+      },
+      {
+        "command": "gitlabMr.setToken",
+        "title": "GitLab MR: Set GitLab Token"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "gitlabMr.createMr",
+          "when": "view == gitlabMr.mrView",
+          "group": "navigation"
+        },
+        {
+          "command": "gitlabMr.refresh",
+          "when": "view == gitlabMr.mrView",
+          "group": "navigation"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "GitLab MR Monitor",
+      "properties": {
+        "gitlabMr.baseUrl": {
+          "type": "string",
+          "default": "https://gitlab.com",
+          "description": "GitLab instance base URL (e.g. https://gitlab.com or a self-hosted GitLab)."
+        },
+        "gitlabMr.refreshIntervalMinutes": {
+          "type": "number",
+          "default": 5,
+          "minimum": 1,
+          "description": "How often the MR list auto-refreshes while the extension is active (minutes). Manual refresh and opening the view also trigger updates."
+        },
+        "gitlabMr.notifyDesktop": {
+          "type": "boolean",
+          "default": true,
+          "description": "Also fire OS-level desktop popups for critical changes (via notify-send)."
+        },
+        "gitlabMr.showCommentsInEditor": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show the open MR's GitLab review comments inline in the editor (VS Code Comments API), anchored to the lines of the current branch."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@types/vscode": "^1.125.0",
+    "typescript": "^5.4.0"
+  }
+}
