@@ -1,6 +1,12 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24">
-  <circle cx="6" cy="6" r="3" fill="none" stroke="#C5CDDB" stroke-width="2"/>
-  <circle cx="18" cy="18" r="3" fill="none" stroke="#C5CDDB" stroke-width="2"/>
-  <path d="M6 9v4a3 3 0 0 0 3 3h6" fill="none" stroke="#C5CDDB" stroke-width="2"/>
-  <path d="M6 9a3 3 0 0 1 0-3M18 18a3 3 0 0 1 0-3" fill="none" stroke="#C5CDDB" stroke-width="2"/>
+  <g fill="none" stroke="#FC6D26" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <!-- left branch -->
+    <path d="M5 4 C5 9 8 11.4 11.8 12.8"/>
+    <!-- right branch -->
+    <path d="M19 4 C19 9 16 11.4 12.2 12.8"/>
+    <!-- merge trunk -->
+    <path d="M12 15.2 V21"/>
+    <!-- merge node -->
+    <circle cx="12" cy="14" r="2.2"/>
+  </g>
 </svg>
