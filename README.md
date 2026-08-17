@@ -12,7 +12,7 @@ Monitor GitLab merge requests from the VS Code activity bar and create merge req
 - **Pipeline details**: click the **pipeline** badge to expand **all stages and jobs**; failing jobs can be **retried** individually, manual jobs show a **Play** button, failed pipelines offer **Retry failed** and **Run new pipeline** (start a fresh MR pipeline).
 - **Copy**: per-MR **copy link** button, plus a **Copy all MRs** button on top.
 - **Edit after creation**: each card has an **Edit description** action that opens a prefilled form (title + markdown description) and updates the MR in place.
-- **Inline review comments**: when your current branch has an open MR, its GitLab code-review comments are shown **anchored to the exact lines in the editor** (VS Code Comments API — gutter + Comments panel). System/bot notes are skipped. Toggle with the `gitlabMr.showCommentsInEditor` setting.
+- **Inline review comments**: when your current branch has an open MR, its GitLab code-review comments appear in **VS Code's built-in Comments panel**, anchored to the exact lines in the editor. Toggle with the `gitlabMr.showCommentsInEditor` setting.
 - **Create MR**: creates a merge request from the current branch. It reads the repository's `.gitlab/merge_request_templates` folder and shows a **form** to fill in the description, changes, testing and checklist sections, quick actions from the template, and any placeholders in the template (e.g. `PUT ID HERE`) as dedicated input fields. If the project root contains a `conventionalCommits.json` (with `requireScopes` and a `scopes` list), the title is built as a conventional commit (`type(scope): description`) with the type and scope picked from drop-downs.
 - **Notifications**: desktop toast (and OS popup for critical events) when a new comment arrives, a pipeline status changes, or a merge conflict appears.
 
@@ -37,7 +37,7 @@ Monitor GitLab merge requests from the VS Code activity bar and create merge req
 
    ```bash
    npx @vscode/vsce package --no-dependencies
-   code --install-extension gitlab-mr-monitor-0.0.5.vsix --force
+   code --install-extension gitlab-mr-monitor-0.1.0.vsix --force
    ```
 
 2. **From the Marketplace**: install `gitlab-mr-monitor` from the Visual Studio Code Marketplace (once published).
@@ -70,6 +70,8 @@ Monitor GitLab merge requests from the VS Code activity bar and create merge req
 | --- | --- |
 | `GitLab MR: Refresh` | Refresh the MR list |
 | `GitLab MR: Create Merge Request from current branch` | Start the MR creation wizard |
+| `GitLab MR: Select Project` | Pick a GitLab project to monitor |
+| `GitLab MR: Clone Project` | Clone the selected project to a local folder |
 | `GitLab MR: Set GitLab Token` | Store your GitLab personal access token (kept in VS Code secrets) |
 
 ## Configuration

@@ -27,6 +27,7 @@
   "categories": [
     "Other"
   ],
+  "icon": "media/icon.png",
   "main": "./out/extension.js",
   "contributes": {
     "viewsContainers": {
@@ -59,8 +60,22 @@
         "icon": "$(git-pull-request)"
       },
       {
+        "command": "gitlabMr.selectProject",
+        "title": "GitLab MR: Select Project",
+        "icon": "$(search)"
+      },
+      {
+        "command": "gitlabMr.cloneProject",
+        "title": "GitLab MR: Clone Project",
+        "icon": "$(repo-clone)"
+      },
+      {
         "command": "gitlabMr.setToken",
         "title": "GitLab MR: Set GitLab Token"
+      },
+      {
+        "command": "gitlabMr.replyToComment",
+        "title": "Reply to GitLab Discussion"
       }
     ],
     "menus": {
@@ -71,9 +86,25 @@
           "group": "navigation"
         },
         {
+          "command": "gitlabMr.selectProject",
+          "when": "view == gitlabMr.mrView",
+          "group": "navigation"
+        },
+        {
+          "command": "gitlabMr.cloneProject",
+          "when": "view == gitlabMr.mrView",
+          "group": "navigation"
+        },
+        {
           "command": "gitlabMr.refresh",
           "when": "view == gitlabMr.mrView",
           "group": "navigation"
+        }
+      ],
+      "comments/commentThread/context": [
+        {
+          "command": "gitlabMr.replyToComment",
+          "when": "commentThread && commentController == gitlabMr"
         }
       ]
     },

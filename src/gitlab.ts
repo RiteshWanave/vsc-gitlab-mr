@@ -34,13 +34,6 @@ export interface Job {
   playable?: boolean;
 }
 
-export interface Note {
-  id: number;
-  body: string;
-  system?: boolean;
-  author?: { username?: string };
-}
-
 export interface DiscussionPosition {
   new_path?: string;
   new_line?: number | null;
@@ -67,6 +60,7 @@ export interface DiscussionNote {
 export interface Discussion {
   id: string;
   individual_note?: boolean;
+  resolvable?: boolean;
   resolved?: boolean;
   notes: DiscussionNote[];
 }
@@ -76,6 +70,9 @@ export interface ProjectInfo {
   path_with_namespace: string;
   default_branch: string;
   web_url: string;
+  name: string;
+  http_url_to_repo: string;
+  ssh_url_to_repo: string;
 }
 
 export interface UserInfo {
@@ -138,10 +135,28 @@ export class GitLabClient {
     return this.request<ProjectInfo>(`/projects/${encodeURIComponent(path)}`);
   }
 
-  getProjectOpenMRs(projectId: number, authorId: number): Promise<MR[]> {
-    return this.request<MR[]>(
-      `/projects/${projectId}/merge_requests?scope=all&author_id=${authorId}&state=opened&per_page=100`
+  searchProjects(search: string): Promise<ProjectInfo[]> {
+    return this.request<ProjectInfo[]>(
+      `/projects?membership=true&simple=true&order_by=last_activity_at&search=${encodeURIComponent(search)}&per_page=50`
     );
+  }
+
+  async getProjectOpenMRs(projectId: number, userId: number): Promise<MR[]> {
+    const base = `/projects/${projectId}/merge_requests?scope=all&state=opened&per_page=100`;
+    const [assigned, authored] = await Promise.all([
+      this.request<MR[]>(`${base}&assignee_id=${userId}`),
+      this.request<MR[]>(`${base}&author_id=${userId}`),
+    ]);
+    const seen = new Set<number>();
+    const merged: MR[] = [];
+    for (const mr of [...assigned, ...authored]) {
+      if (seen.has(mr.iid)) {
+        continue;
+      }
+      seen.add(mr.iid);
+      merged.push(mr);
+    }
+    return merged;
   }
 
   getMRDetail(projectId: number, iid: number): Promise<MRDetail> {
@@ -188,19 +203,6 @@ export class GitLabClient {
     });
   }
 
-  createPipeline(projectId: number, ref: string): Promise<Pipeline> {
-    return this.request<Pipeline>(`/projects/${projectId}/pipeline`, {
-      method: 'POST',
-      body: JSON.stringify({ ref }),
-    });
-  }
-
-  getNotes(projectId: number, iid: number): Promise<Note[]> {
-    return this.request<Note[]>(
-      `/projects/${projectId}/merge_requests/${iid}/notes?sort=asc&per_page=100`
-    );
-  }
-
   getDiscussions(projectId: number, iid: number): Promise<Discussion[]> {
     return this.request<Discussion[]>(
       `/projects/${projectId}/merge_requests/${iid}/discussions?per_page=100`
@@ -229,5 +231,17 @@ export class GitLabClient {
       method: 'POST',
       body: JSON.stringify(params),
     });
+  }
+
+  postDiscussionNote(
+    projectId: number,
+    iid: number,
+    discussionId: string,
+    body: string
+  ): Promise<DiscussionNote> {
+    return this.request<DiscussionNote>(
+      `/projects/${projectId}/merge_requests/${iid}/discussions/${discussionId}/notes`,
+      { method: 'POST', body: JSON.stringify({ body }) }
+    );
   }
 }

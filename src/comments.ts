@@ -6,12 +6,17 @@ import { EnrichedMR } from './monitor';
 export class MrCommentProvider {
   private controller: vscode.CommentController;
   private threads: vscode.CommentThread[] = [];
+  private threadInfo = new Map<vscode.CommentThread, { discussionId: string; projectId: number; iid: number }>();
 
   constructor(private gitlab: GitLabClient) {
     this.controller = vscode.comments.createCommentController('gitlabMr', 'GitLab MR');
     this.controller.commentingRangeProvider = {
       provideCommentingRanges: () => [],
     };
+  }
+
+  getThreadInfo(thread: vscode.CommentThread): { discussionId: string; projectId: number; iid: number } | undefined {
+    return this.threadInfo.get(thread);
   }
 
   dispose(): void {
@@ -21,6 +26,7 @@ export class MrCommentProvider {
 
   clear(): void {
     for (const t of this.threads) {
+      this.threadInfo.delete(t);
       t.dispose();
     }
     this.threads = [];
@@ -36,22 +42,12 @@ export class MrCommentProvider {
     }
     for (const d of discussions) {
       const diffNote = d.notes.find((n) => n.position);
-      if (!diffNote) {
+      if (!diffNote?.position?.new_path) {
         continue;
       }
-      const pos = diffNote.position;
-      if (!pos) {
-        continue;
-      }
-      const filePath = pos.new_path;
-      if (!filePath) {
-        continue;
-      }
-      const line = pos.new_line ?? pos.head_line ?? pos.old_line;
-      if (!line || line < 1) {
-        continue;
-      }
-      const uri = vscode.Uri.file(path.join(repoRoot, filePath));
+      const line = diffNote.position.new_line ?? diffNote.position.head_line ?? diffNote.position.old_line ?? 1;
+      if (line < 1) { continue; }
+      const uri = vscode.Uri.file(path.join(repoRoot, diffNote.position.new_path));
       const comments = d.notes
         .filter((n) => !n.system)
         .map((n) => this.toComment(n));
@@ -64,11 +60,13 @@ export class MrCommentProvider {
         comments
       );
       thread.canReply = false;
-      thread.collapsibleState = vscode.CommentThreadCollapsibleState.Collapsed;
       const resolved = d.resolved ?? d.notes[0]?.resolved ?? false;
+      thread.contextValue = resolved ? 'gitlabMr-thread-resolved' : 'gitlabMr-thread-unresolved';
+      thread.collapsibleState = vscode.CommentThreadCollapsibleState.Collapsed;
       thread.state = resolved
         ? vscode.CommentThreadState.Resolved
         : vscode.CommentThreadState.Unresolved;
+      this.threadInfo.set(thread, { discussionId: d.id, projectId: mr.project_id, iid: mr.iid });
       this.threads.push(thread);
     }
   }

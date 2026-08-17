@@ -137,7 +137,27 @@ export class MrViewProvider implements vscode.WebviewViewProvider {
     if (!this.view) {
       return;
     }
-    const cards = this.mrs.map((m) => ({
+    const cards = this.mrs.map((m) => {
+      const discussions = (m.discussions || []).filter((d) =>
+        (d.notes || []).some((n) => n.position)
+      ).map((d) => ({
+        id: d.id,
+        resolved: !!d.resolved,
+        resolvable: !!d.resolvable,
+        notes: (d.notes || []).map((n) => ({
+          id: n.id,
+          body: n.body,
+          author: n.author?.name || n.author?.username || 'unknown',
+          username: n.author?.username || '',
+          system: !!n.system,
+          resolved: !!n.resolved,
+        })),
+      }));
+      let unresolvedComments = 0;
+      for (const d of discussions) {
+        if (d.resolvable && !d.resolved) { unresolvedComments++; }
+      }
+      return {
       iid: m.iid,
       title: m.title,
       webUrl: m.web_url,
@@ -147,7 +167,8 @@ export class MrViewProvider implements vscode.WebviewViewProvider {
       mergeStatus: m.detail.merge_status,
       approvalsApproved: m.approvalsApproved,
       approvalsRequired: m.approvalsRequired,
-      reviewComments: m.reviewCommentCount,
+      unresolvedComments,
+      discussions,
       pipeline: {
         id: m.pipeline.id,
         status: m.pipeline.status,
@@ -155,7 +176,7 @@ export class MrViewProvider implements vscode.WebviewViewProvider {
         failedStage: m.pipeline.failedStage,
         stages: m.pipeline.stages.slice(0, 100),
       },
-    }));
+    }; });
     void this.view.webview.postMessage({
       type: 'data',
       projectName: this.projectName,
@@ -244,7 +265,7 @@ function getWebviewHtml(): string {
       var list = document.getElementById('list');
       var statusEl = document.getElementById('status');
       var projectEl = document.getElementById('project');
-      var expanded = {};
+      var expandedPipe = {};
 
       function badge(text, cls, title) {
         var s = document.createElement('span');
@@ -337,14 +358,18 @@ function getWebviewHtml(): string {
             : (mr.pipeline.status === 'running' || mr.pipeline.status === 'pending') ? 'b-running'
             : mr.pipeline.status === 'manual' ? 'b-manual'
             : 'b-default';
-          var pipe = badge('pipeline: ' + mr.pipeline.status + (expanded[mr.iid] ? ' ▴' : ' ▾'), 'pipe ' + pipeCls, 'Show pipeline stages & jobs');
+          var pipe = badge('pipeline: ' + mr.pipeline.status + (expandedPipe[mr.iid] ? ' ▴' : ' ▾'), 'pipe ' + pipeCls, 'Show pipeline stages & jobs');
           pipe.dataset.i = String(i);
           badges.appendChild(pipe);
           if (mr.pipeline.stage) {
             badges.appendChild(badge('stage: ' + mr.pipeline.stage, 'b-default'));
           }
-          if (mr.reviewComments > 0) {
-            badges.appendChild(badge('💬 ' + mr.reviewComments, 'b-default', 'Review comments'));
+          if (mr.unresolvedComments > 0) {
+            var cBadge = document.createElement('span');
+            cBadge.className = 'badge b-default';
+            cBadge.textContent = '💬 ' + mr.unresolvedComments;
+            cBadge.title = mr.unresolvedComments + ' unresolved comment(s) needing resolution';
+            badges.appendChild(cBadge);
           }
           if (mr.approvalsRequired > 0) {
             var done = Math.min(mr.approvalsApproved, mr.approvalsRequired);
@@ -359,7 +384,7 @@ function getWebviewHtml(): string {
           }
           card.appendChild(badges);
 
-          if (expanded[mr.iid]) {
+          if (expandedPipe[mr.iid]) {
             var panel = document.createElement('div');
             panel.className = 'stages';
             var hasJobs = false;
@@ -491,7 +516,7 @@ function getWebviewHtml(): string {
         }
         if (t.classList && t.classList.contains('pipe')) {
           var mr = cards[Number(t.dataset.i)];
-          expanded[mr.iid] = !expanded[mr.iid];
+          expandedPipe[mr.iid] = !expandedPipe[mr.iid];
           render(cards, null, projectEl.textContent);
           return;
         }

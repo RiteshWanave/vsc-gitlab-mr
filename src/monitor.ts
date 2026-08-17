@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { GitLabClient, MR, MRDetail, ApprovalState, Job } from './gitlab';
+import { GitLabClient, MR, MRDetail, ApprovalState, Job, Discussion } from './gitlab';
 
 export interface PipelineJob {
   id: number;
@@ -29,12 +29,13 @@ export interface EnrichedMR extends MR {
   lastNoteId: string;
   lastNoteAuthor: string;
   lastNoteBody: string;
+  discussions: Discussion[];
   projectName: string;
   approvalsApproved: number;
   approvalsRequired: number;
 }
 
-export interface Snapshot {
+interface Snapshot {
   lastNoteId?: string;
   pipeStatus?: string;
   hasConflicts?: boolean;
@@ -49,13 +50,13 @@ export interface MonitorEvent {
   critical: boolean;
 }
 
-export interface MonitorResult {
+interface MonitorResult {
   projectPath: string;
   mrs: EnrichedMR[];
   events: MonitorEvent[];
 }
 
-export function mrProjectName(mr: MR): string {
+function mrProjectName(mr: MR): string {
   const full = mr.references?.full || '';
   const idx = full.lastIndexOf('!');
   if (idx > -1) {
@@ -64,7 +65,7 @@ export function mrProjectName(mr: MR): string {
   return `project ${mr.project_id}`;
 }
 
-export function mrKey(mr: MR): string {
+function mrKey(mr: MR): string {
   return `P${mr.project_id}-MR${mr.iid}`;
 }
 
@@ -249,20 +250,24 @@ export class MrMonitor {
       let lastNoteAuthor = cached ? cached.lastNoteAuthor : '';
       let lastNoteBody = cached ? cached.lastNoteBody : '';
       let reviewCommentCount = cached ? cached.reviewCommentCount : 0;
+      let discussions: Discussion[] = cached ? cached.discussions || [] : [];
       if (full) {
         lastNoteId = '';
         lastNoteAuthor = '';
         lastNoteBody = '';
         reviewCommentCount = 0;
+        discussions = [];
         try {
-          const notes = await this.gitlab.getNotes(mr.project_id, mr.iid);
-          const last = notes.length > 0 ? notes[notes.length - 1] : undefined;
-          if (last) {
+          discussions = await this.gitlab.getDiscussions(mr.project_id, mr.iid);
+          const allNotes = discussions.flatMap((d) => d.notes || []);
+          const userNotes = allNotes.filter((n) => !n.system);
+          reviewCommentCount = userNotes.length;
+          if (userNotes.length > 0) {
+            const last = userNotes[userNotes.length - 1];
             lastNoteId = String(last.id);
             lastNoteAuthor = last.author?.username || '';
             lastNoteBody = last.body || '';
           }
-          reviewCommentCount = notes.filter((n) => !n.system).length;
         } catch {
           // keep empty
         }
@@ -313,6 +318,7 @@ export class MrMonitor {
         lastNoteId,
         lastNoteAuthor,
         lastNoteBody,
+        discussions,
         projectName: mrProjectName(mr),
         approvalsApproved,
         approvalsRequired,

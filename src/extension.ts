@@ -13,6 +13,26 @@ export function activate(context: vscode.ExtensionContext): void {
   let gitlab: GitLabClient | null = null;
   let commentProvider: MrCommentProvider | null = null;
 
+  const SELECTED_PROJECT_KEY = 'gitlabMr.selectedProject';
+
+  function getSelectedProject(): { path: string; name: string } | undefined {
+    return context.globalState.get<{ path: string; name: string }>(
+      SELECTED_PROJECT_KEY
+    );
+  }
+
+  function execFileP(cmd: string, args: string[]): Promise<string> {
+    return new Promise((resolve, reject) => {
+      execFile(cmd, args, { maxBuffer: 10 * 1024 * 1024 }, (err, stdout) => {
+        if (err) {
+          reject(err);
+        } else {
+          resolve(String(stdout));
+        }
+      });
+    });
+  }
+
   const provider = new MrViewProvider({
     onRefresh: () => void refresh(true),
     onRefreshLight: () => void refresh(false),
@@ -100,7 +120,7 @@ export function activate(context: vscode.ExtensionContext): void {
     void refresh();
   }
 
-  async function currentProjectPath(): Promise<string | null> {
+  async function workspaceProjectPath(): Promise<string | null> {
     const root = findGitRoot();
     if (!root) {
       return null;
@@ -113,6 +133,51 @@ export function activate(context: vscode.ExtensionContext): void {
     }
   }
 
+  async function currentProjectPath(): Promise<string | null> {
+    const selected = getSelectedProject();
+    if (selected) {
+      return selected.path;
+    }
+    return workspaceProjectPath();
+  }
+
+  async function searchAndPickProject(
+    client: GitLabClient
+  ): Promise<{ path: string; name: string } | undefined> {
+    const term = await vscode.window.showInputBox({
+      title: 'GitLab MR — Select Project',
+      prompt: 'Search your accessible GitLab projects (leave empty to list recent ones)',
+    });
+    if (term === undefined) {
+      return undefined;
+    }
+    return vscode.window.withProgress(
+      { location: { viewId: 'gitlabMr.mrView' }, title: 'Searching projects…' },
+      async () => {
+        const projects = await client.searchProjects(term.trim());
+        if (projects.length === 0) {
+          void vscode.window.showWarningMessage(
+            'No GitLab projects found for that search.'
+          );
+          return undefined;
+        }
+        const pick = await vscode.window.showQuickPick(
+          projects.map((p) => ({
+            label: p.path_with_namespace,
+            description: p.name || '',
+            p,
+          })),
+          { placeHolder: 'Select a GitLab project to monitor' }
+        );
+        if (!pick) {
+          return undefined;
+        }
+        return { path: pick.p.path_with_namespace, name: pick.p.name };
+      }
+    );
+  }
+
+
   async function refresh(full = true): Promise<void> {
     const client = await ensureClient();
     if (!client) {
@@ -120,7 +185,9 @@ export function activate(context: vscode.ExtensionContext): void {
     }
     const projectPath = await currentProjectPath();
     if (!projectPath) {
-      provider.setMessage('Open a Git repository with a GitLab remote to monitor its MRs.');
+      provider.setMessage(
+        'Select a project (GitLab MR: Select Project) or open a Git repository with a GitLab remote to monitor its MRs.'
+      );
       return;
     }
 
@@ -322,8 +389,149 @@ export function activate(context: vscode.ExtensionContext): void {
     });
   }
 
+  async function selectProject(): Promise<void> {
+    const client = await ensureClient();
+    if (!client) {
+      return;
+    }
+    const picked = await searchAndPickProject(client);
+    if (!picked) {
+      return;
+    }
+    await context.globalState.update(SELECTED_PROJECT_KEY, picked);
+    void vscode.window.showInformationMessage(`Monitoring ${picked.path}.`);
+    void refresh();
+  }
+
+  async function cloneProject(): Promise<void> {
+    const client = await ensureClient();
+    if (!client) {
+      return;
+    }
+
+    const current = getSelectedProject();
+    const workspace = await workspaceProjectPath();
+    const options: vscode.QuickPickItem[] = [];
+    if (current) {
+      options.push({
+        label: current.path,
+        description: current.name || 'Selected project',
+      });
+    }
+    if (workspace && workspace !== current?.path) {
+      options.push({
+        label: workspace,
+        description: 'Current git repository',
+      });
+    }
+    options.push({ label: '$(search) Search for a project…' });
+
+    const choice = await vscode.window.showQuickPick(options, {
+      placeHolder: 'Choose a project to clone',
+    });
+    if (!choice) {
+      return;
+    }
+
+    let projectPath: string;
+    if (choice.label === '$(search) Search for a project…') {
+      const picked = await searchAndPickProject(client);
+      if (!picked) {
+        return;
+      }
+      projectPath = picked.path;
+    } else {
+      projectPath = choice.label;
+    }
+
+    let project;
+    try {
+      project = await client.getProject(projectPath);
+    } catch (err) {
+      void vscode.window.showErrorMessage(
+        `Could not load project ${projectPath}: ${(err as Error).message}`
+      );
+      return;
+    }
+    const method = await vscode.window.showQuickPick(
+      [
+        { label: 'SSH', description: project.ssh_url_to_repo },
+        { label: 'HTTPS', description: project.http_url_to_repo },
+      ],
+      { placeHolder: `Choose clone method for ${project.path_with_namespace}` }
+    );
+    if (!method) {
+      return;
+    }
+    const url =
+      method.label === 'SSH'
+        ? project.ssh_url_to_repo
+        : project.http_url_to_repo;
+
+    const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+    let target: vscode.Uri;
+    let alreadyOpen = false;
+    if (workspaceFolder) {
+      target = workspaceFolder.uri;
+      alreadyOpen = true;
+    } else {
+      const dest = await vscode.window.showOpenDialog({
+        canSelectFolders: true,
+        canSelectFiles: false,
+        canSelectMany: false,
+        openLabel: 'Select clone destination',
+        title: `Choose where to clone ${project.path_with_namespace}`,
+      });
+      if (!dest || dest.length === 0) {
+        return;
+      }
+      target = dest[0];
+    }
+
+    try {
+      await vscode.window.withProgress(
+        {
+          location: { viewId: 'gitlabMr.mrView' },
+          title: `Cloning ${project.path_with_namespace}…`,
+        },
+        () => execFileP('git', ['clone', url, target.fsPath])
+      );
+    } catch (err) {
+      void vscode.window.showErrorMessage(
+        `Clone failed: ${(err as Error).message}`
+      );
+      return;
+    }
+    await context.globalState.update(SELECTED_PROJECT_KEY, {
+      path: project.path_with_namespace,
+      name: project.name,
+    });
+    void refresh();
+    if (alreadyOpen) {
+      void vscode.window.showInformationMessage(
+        `Cloned ${project.path_with_namespace} into ${target.fsPath}.`
+      );
+      return;
+    }
+    const answer = await vscode.window.showInformationMessage(
+      `Cloned ${project.path_with_namespace} into ${target.fsPath}.`,
+      'Open Folder'
+    );
+    if (answer === 'Open Folder') {
+      await vscode.commands.executeCommand('vscode.openFolder', target);
+    }
+  }
+
   context.subscriptions.push(
     vscode.commands.registerCommand('gitlabMr.refresh', () => void refresh()),
+
+    vscode.commands.registerCommand('gitlabMr.selectProject', () =>
+      void selectProject()
+    ),
+
+    vscode.commands.registerCommand('gitlabMr.cloneProject', () =>
+      void cloneProject()
+    ),
 
     vscode.commands.registerCommand('gitlabMr.createMr', async () => {
       const client = await ensureClient();
@@ -333,7 +541,41 @@ export function activate(context: vscode.ExtensionContext): void {
       await createMrFlow(client, () => void refresh());
     }),
 
-    vscode.commands.registerCommand('gitlabMr.setToken', () => setTokenCommand())
+    vscode.commands.registerCommand('gitlabMr.setToken', () => setTokenCommand()),
+
+    vscode.commands.registerCommand(
+      'gitlabMr.replyToComment',
+      async (thread: vscode.CommentThread) => {
+        if (!commentProvider) {
+          return;
+        }
+        const info = commentProvider.getThreadInfo(thread);
+        if (!info) {
+          return;
+        }
+        const body = await vscode.window.showInputBox({
+          title: `Reply to discussion on !${info.iid}`,
+          prompt: 'Type your reply',
+          placeHolder: 'Write a comment…',
+        });
+        if (!body || !body.trim()) {
+          return;
+        }
+        const client = await ensureClient();
+        if (!client) {
+          return;
+        }
+        try {
+          await client.postDiscussionNote(info.projectId, info.iid, info.discussionId, body.trim());
+          void vscode.window.showInformationMessage('Reply posted.');
+          void refresh();
+        } catch (err) {
+          void vscode.window.showErrorMessage(
+            `Failed to post reply: ${(err as Error).message}`
+          );
+        }
+      }
+    ),
   );
 
   const minutes = getRefreshMinutes();

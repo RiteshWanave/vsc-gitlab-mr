@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-08-17
+
+### Added
+- Project selection (`GitLab MR: Select Project`) to monitor any GitLab project, not just the current repo.
+- Clone project (`GitLab MR: Clone Project`) to clone the selected project directly from the sidebar.
+- MR filter shows merge requests where you are the **author** or **assignee**.
+- Inline review comments use VS Code's built-in Comments panel with gutter indicators.
+- Comments auto-populate when on a branch that has an open MR — no manual command needed.
+
+### Changed
+- Sidebar 💬 badge shows unresolved comment count (read-only, no click action).
+- MR cards only display human review comments (bot/CI comments excluded).
+
+### Removed
+- Custom Comments panel (replaced by VS Code's built-in Comments panel).
+- Bot/CI/SonarQube comment display from cards and editor.
+- Reply, Resolve, and Reopen actions on comment threads.
+- Dead code: `commentsPanel.ts`, `getNotes()`, `createPipeline()`, `Note` interface, unused exports.
+
 ## [0.0.5] - 2026-08-15
 
 ### Added
