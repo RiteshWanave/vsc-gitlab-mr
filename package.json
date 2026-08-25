@@ -2,7 +2,7 @@
   "name": "gitlab-mr-monitor",
   "displayName": "GitLab MR Monitor & Creator",
   "description": "Monitor GitLab merge requests and create MRs from the current branch using .gitlab/merge_request_templates",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "publisher": "RiteshRamWanave",
   "license": "MIT",
   "repository": {
