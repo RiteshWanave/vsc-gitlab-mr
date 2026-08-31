@@ -1,6 +1,6 @@
 {
-  "name": "gitlab-mr-monitor",
-  "displayName": "GitLab MR Monitor & Creator",
+  "name": "gitlab-mr-manager",
+  "displayName": "GitLab MR Manager",
   "description": "Monitor GitLab merge requests and create MRs from the current branch using .gitlab/merge_request_templates",
   "version": "0.1.1",
   "publisher": "RiteshRamWanave",
